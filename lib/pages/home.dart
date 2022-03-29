@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:sqflite/sqflite.dart';
 import 'package:strava_add_on/services/file_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:location/location.dart';
@@ -12,8 +13,10 @@ class Home extends StatefulWidget {
 
 class _HomeState extends State<Home> {
 
-  bool xmlData = false;
   XmlFiles newXmlFile = XmlFiles(xmlFileName: 'Paris_Marathon_route');
+  Database? database;
+  List<Map<String,Object?>> listData = [];
+  List<Map<String,Object?>> results = [];
 
   @override
   void initState() {
@@ -36,13 +39,34 @@ class _HomeState extends State<Home> {
               const SizedBox(height: 10.0,),
               OutlinedButton(
                   onPressed: () async {
-                    await newXmlFile.getXmlContent(context);
-                    xmlData = true;
-                    setState(() {});
+                    listData = await newXmlFile.getXmlContent(context);
                   },
                   child: const Text('Read from file')),
               const SizedBox(height: 10.0,),
-              Text(xmlData ? 'Has data' : 'No data yet')
+              OutlinedButton(
+                  onPressed: () async {
+                    database = await newXmlFile.createDb();
+                  },
+                  child: const Text('Create Db')),
+              const SizedBox(height: 10.0,),
+              OutlinedButton(
+                  onPressed: () async {
+                    await newXmlFile.insertDb(listData, database!);
+                  },
+                  child: const Text('Insert in Db')),
+              const SizedBox(height: 10.0,),
+              OutlinedButton(
+                  onPressed: () async {
+                    results = await newXmlFile.queryDb(database!);
+                    setState(() {});
+                  },
+                  child: const Text('Query Db')),
+              Expanded(child: ListView.builder(
+                  shrinkWrap: true,
+                  scrollDirection: Axis.vertical,
+                  itemCount:(results).length,
+                  itemBuilder: (context, index) => Text('id: ${results[index]['id']} - lat: ${results[index]['lat']} - lon: ${results[index]['lon']}', style: const TextStyle(fontSize: 12.0),)
+              ))
             ],
           ),
         ),
