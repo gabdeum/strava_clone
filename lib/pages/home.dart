@@ -13,14 +13,21 @@ class Home extends StatefulWidget {
 
 class _HomeState extends State<Home> {
 
-  XmlFiles newXmlFile = XmlFiles(xmlFileName: 'Paris_Marathon_route');
+  XmlFiles newXmlFile = XmlFiles(xmlFileName: 'Test_1');
   Database? database;
   List<Map<String,Object?>> listData = [];
   List<Map<String,Object?>> results = [];
+  StreamSubscription? locationSubscription;
 
   @override
   void initState() {
     super.initState();
+  }
+
+  @override
+  void dispose() {
+    locationSubscription?.cancel();
+    super.dispose();
   }
 
   @override
@@ -37,28 +44,40 @@ class _HomeState extends State<Home> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const SizedBox(height: 10.0,),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  OutlinedButton(
+                      onPressed: () async {
+                        Stream<LocationData>? locationStream = await getLocation();
+                        locationSubscription = locationStream?.listen((event) async {
+                          results = await newXmlFile.queryDb(database, event.latitude, event.longitude);
+                          setState(() {});
+                        });
+                      },
+                      child: const Text('Get location stream')),
+                  const SizedBox(width: 10.0,),
+                  OutlinedButton(
+                      onPressed: () {
+                        locationSubscription?.cancel();
+                      },
+                      child: const Text('Stop location sub')),
+                ],
+              ),
+              const SizedBox(height: 10.0,),
               OutlinedButton(
                   onPressed: () async {
                     listData = await newXmlFile.getXmlContent(context);
-                  },
-                  child: const Text('Read from file')),
-              const SizedBox(height: 10.0,),
-              OutlinedButton(
-                  onPressed: () async {
                     database = await newXmlFile.createDb();
+                    await newXmlFile.insertDb(listData, database);
                   },
-                  child: const Text('Create Db')),
+                  child: const Text('Initialize data')),
+              const SizedBox(height: 10.0,),
+              const Center(child: Text('lat:  - lon: ')),
               const SizedBox(height: 10.0,),
               OutlinedButton(
                   onPressed: () async {
-                    await newXmlFile.insertDb(listData, database!);
-                  },
-                  child: const Text('Insert in Db')),
-              const SizedBox(height: 10.0,),
-              OutlinedButton(
-                  onPressed: () async {
-                    results = await newXmlFile.queryDb(database!);
-                    setState(() {});
+
                   },
                   child: const Text('Query Db')),
               Expanded(child: ListView.builder(
@@ -66,7 +85,7 @@ class _HomeState extends State<Home> {
                   scrollDirection: Axis.vertical,
                   itemCount:(results).length,
                   itemBuilder: (context, index) => Text('id: ${results[index]['id']} - lat: ${results[index]['lat']} - lon: ${results[index]['lon']}', style: const TextStyle(fontSize: 12.0),)
-              ))
+              )),
             ],
           ),
         ),
@@ -74,18 +93,18 @@ class _HomeState extends State<Home> {
     );
   }
 
-  getLocation() async {
+  Future<Stream<LocationData>?> getLocation() async {
 
     bool _serviceEnabled;
     PermissionStatus _permissionGranted;
     Location location = Location();
-    Stream<LocationData> _locationStream;
+    Stream<LocationData>? _locationStream;
 
     _serviceEnabled = await location.serviceEnabled();
     if (!_serviceEnabled) {
       _serviceEnabled = await location.requestService();
       if (!_serviceEnabled) {
-        return;
+        print('Location service not enabled');
       }
     }
 
@@ -93,7 +112,7 @@ class _HomeState extends State<Home> {
     if (_permissionGranted == PermissionStatus.denied) {
       _permissionGranted = await location.requestPermission();
       if (_permissionGranted != PermissionStatus.granted) {
-        return;
+        print('Location denied by user');
       }
     }
 
